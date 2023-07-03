@@ -82,16 +82,31 @@ def save_message(chat_id, text, sender, sentiment_score):
     print("Message saved successfully!")
 
 
-def get_parents_to_alert(minutes, sentiment_minimum):
-    minutes_ago = datetime.now() - timedelta(minutes)
+def run_analysis():
+    ten_minutes_ago = datetime.now() - timedelta(minutes=10)
+    messages = session.query(Message).filter(Message.time >= ten_minutes_ago).all()
 
-    # Query to fetch parent entities, their chats, and messages meeting the criteria
-    results = session.query(Parent, Chat.name, Message) \
-        .join(Chat, Parent.id == Chat.parent_id) \
-        .join(Message, Chat.id == Message.chat_id) \
-        .filter(Message.time >= minutes_ago) \
-        .group_by(Parent, Chat.name) \
-        .having(func.avg(Message.sentiment_score) >= sentiment_minimum) \
-        .all()
+    grouped_messages = {}
+    for message in messages:
+        if message.chat_id not in grouped_messages:
+            grouped_messages[message.chat_id] = []
 
-    return results
+        grouped_messages[message.chat_id].append(message)
+
+    # Process the grouped messages as needed
+    chats_to_alert = []
+
+    for chat_id, chat_messages in grouped_messages.items():
+        print(f"Chat ID: {chat_id}")
+        sentiment_score_sum = 0
+        for message in chat_messages:
+            sentiment_score_sum += message.sentiment_score
+            print(f"Message ID: {message.id}, Text: {message.text}")
+        sentiment_avg = sentiment_score_sum / len(chat_messages)
+
+        if sentiment_avg > 0.4:
+            chats_to_alert.append(chat_id)
+
+    parents_to_alert = [session.query(Chat).get(chat_id).parent_id for chat_id in chats_to_alert]
+
+    return parents_to_alert

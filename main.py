@@ -3,6 +3,7 @@ import json
 from models import *
 from googletrans import Translator
 from flask import Flask, request
+from apscheduler.schedulers.background import BackgroundScheduler
 
 sentiment_ai_url = "https://api-inference.huggingface.co/models/cardiffnlp/twitter-roberta-base-sentiment"
 
@@ -53,6 +54,11 @@ def add_message():
     save_message(data['chat_id'], data['text'], data['sender'], get_sentiment_score(data['text']))
 
     return 'Success'
+
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=run_analysis, trigger="interval", seconds=600)
+scheduler.start()
 
 
 if __name__ == '__main__':
